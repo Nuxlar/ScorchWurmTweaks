@@ -1,4 +1,4 @@
-# New Mod
+# Scorch Wurm Tweaks
 
 A template for a Risk of Rain 2 mod. Updated for game version v1.3.6#371
 
