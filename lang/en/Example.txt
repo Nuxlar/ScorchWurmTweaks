@@ -1,0 +1,6 @@
+{
+	strings:
+	{
+		"NEW_MOD_EXAMPLE_STRING": "Huge Example",
+	}
+}
