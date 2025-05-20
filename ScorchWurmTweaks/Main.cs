@@ -56,12 +56,11 @@ namespace ScorchWurmTweaks
       curve.AddKey(0f, 0f);
       curve.AddKey(1f, 1f);
 
-      // scorchlingBombZoneGhost.transform.GetChild(0).localScale = Vector3.zero;
+      // 8.84 8.84 8.84 indicator scale
       ObjectScaleCurve objectScaleCurve = scorchlingBombZoneGhost.transform.GetChild(0).gameObject.AddComponent<ObjectScaleCurve>();
       objectScaleCurve.overallCurve = curve;
       objectScaleCurve.useOverallCurveOnly = true;
       objectScaleCurve.timeMax = 0.25f;
-      // 8.84 8.84 8.84
 
       ContentAddition.AddEntityState<BetterScorchlingBurrow>(out _);
       burrowDef.activationState = new SerializableEntityStateType(typeof(BetterScorchlingBurrow));
@@ -71,7 +70,6 @@ namespace ScorchWurmTweaks
       AISkillDriver[] skillDrivers = scorchlingMaster.GetComponents<AISkillDriver>();
       foreach (AISkillDriver skillDriver in skillDrivers)
       {
-        //  if (skillDriver.customName == "ChaseOffNodegraphClose" || skillDriver.customName == "ChaseOffNodegraph" || skillDriver.customName == "FollowNodeGraphToTarget")
         if (skillDriver.customName == "ChaseOffNodegraphClose" || skillDriver.customName == "FollowNodeGraphToTarget")
         {
           GameObject.Destroy(skillDriver);
@@ -94,10 +92,8 @@ namespace ScorchWurmTweaks
         }
         if (skillDriver.customName == "LavaBomb")
         {
-          //  skillDriver.activationRequiresTargetLoS = true;
           skillDriver.maxDistance = 50f;
           skillDriver.noRepeat = false;
-          // skillDriver.activationRequiresTargetLoS = true;
         }
       }
 
