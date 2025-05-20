@@ -19,6 +19,7 @@ public class BetterScorchlingBurrow : BaseState
     public float burrowRadius = 1f;
     public float animDurationBurrow = 1f;
     public float burrowAnimationDuration = 1f;
+    public float teleportDelay = 2f;
     private ScorchlingController sController;
     private bool waitingForBurrow;
 
@@ -50,6 +51,9 @@ public class BetterScorchlingBurrow : BaseState
     {
         base.FixedUpdate();
         this.HandleWaitForBurrow();
+        if (this.fixedAge <= this.teleportDelay)
+            return;
+        this.outer.SetNextState(new ScorchlingBreach());
     }
 
     public override void OnExit()
@@ -64,7 +68,6 @@ public class BetterScorchlingBurrow : BaseState
             return;
         this.sController.Burrow();
         this.waitingForBurrow = false;
-        this.outer.SetNextState(new ScorchlingBreach());
     }
 
     private bool ShouldReposition()
@@ -77,7 +80,13 @@ public class BetterScorchlingBurrow : BaseState
         {
             Vector3 footPosition = this.characterBody.footPosition;
             NodeGraph nodeGraph = SceneInfo.instance.GetNodeGraph(MapNodeGroup.GraphType.Ground);
-            Vector3 position1 = enemyCBody.coreTransform.position;
+            Vector3 position1 = RaycastToFloor(enemyCBody.coreTransform.position);
+            if (position1 == enemyCBody.coreTransform.position)
+            {
+                shouldReposition = false;
+                return shouldReposition;
+            }
+
             List<NodeGraph.NodeIndex> nodesInRange = nodeGraph.FindNodesInRange(position1, 10f, 20f, HullMask.Golem);
             Vector3 position2 = new Vector3();
             bool flag = false;
@@ -92,18 +101,20 @@ public class BetterScorchlingBurrow : BaseState
                     flag = true;
             }
             breachPosition = position2 + Vector3.up * 1.5f;
-            Debug.LogWarning(breachPosition);
-            Debug.LogWarning(footPosition);
-            Debug.LogWarning("------------");
 
             if (breachPosition.x >= (footPosition.x - 2f) && breachPosition.x <= (footPosition.x + 2f) && breachPosition.z >= (footPosition.z - 2f) && breachPosition.z <= (footPosition.z + 2f) && breachPosition.y >= (footPosition.y - 5f) && breachPosition.y <= (footPosition.y + 5f))
             {
-                Debug.LogWarning("this node is too close to teleport to, maintain position.");
                 shouldReposition = false;
             }
         }
 
         return shouldReposition;
+    }
+
+    private Vector3 RaycastToFloor(Vector3 position)
+    {
+        RaycastHit hitInfo;
+        return Physics.Raycast(new Ray(position, Vector3.down), out hitInfo, 200f, (int)LayerIndex.world.mask, QueryTriggerInteraction.Ignore) ? hitInfo.point : position;
     }
 
     public override InterruptPriority GetMinimumInterruptPriority()

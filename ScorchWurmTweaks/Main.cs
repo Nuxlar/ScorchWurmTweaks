@@ -15,6 +15,7 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.Networking;
 using R2API;
 using RoR2.Skills;
+using RoR2.Projectile;
 
 namespace ScorchWurmTweaks
 {
@@ -34,7 +35,9 @@ namespace ScorchWurmTweaks
     private GameObject scorchlingMaster = Addressables.LoadAssetAsync<GameObject>("RoR2/DLC2/Scorchling/ScorchlingMaster.prefab").WaitForCompletion();
     private SkillDef burrowDef = Addressables.LoadAssetAsync<SkillDef>("RoR2/DLC2/Scorchling/ScorchlingEnsureBurrow.asset").WaitForCompletion();
     private SkillDef breachDef = Addressables.LoadAssetAsync<SkillDef>("RoR2/DLC2/Scorchling/ScorchlingBreach.asset").WaitForCompletion();
-
+    private GameObject scorchlingBody = Addressables.LoadAssetAsync<GameObject>("RoR2/DLC2/Scorchling/ScorchlingBody.prefab").WaitForCompletion();
+    private GameObject scorchlingBombZone = Addressables.LoadAssetAsync<GameObject>("RoR2/DLC2/Scorchling/LavaBombHeatOrbProjectile.prefab").WaitForCompletion();
+    private GameObject scorchlingBombZoneGhost = Addressables.LoadAssetAsync<GameObject>("RoR2/DLC2/Scorchling/LavaBombHeatOrbGhost.prefab").WaitForCompletion();
 
     public void Awake()
     {
@@ -44,17 +47,42 @@ namespace ScorchWurmTweaks
 
       Log.Init(Logger);
 
+      CharacterBody body = scorchlingBody.GetComponent<CharacterBody>();
+      body.baseMoveSpeed = 0f;
+
+      // scorchlingBombZone.GetComponent<ProjectileDotZone>().lifetime = 6f;
+      // scorchlingBombZone.GetComponent<DestroyOnTimer>().duration = 6f; // 3f
+      AnimationCurve curve = new AnimationCurve();
+      curve.AddKey(0f, 0f);
+      curve.AddKey(1f, 1f);
+
+      // scorchlingBombZoneGhost.transform.GetChild(0).localScale = Vector3.zero;
+      ObjectScaleCurve objectScaleCurve = scorchlingBombZoneGhost.transform.GetChild(0).gameObject.AddComponent<ObjectScaleCurve>();
+      objectScaleCurve.overallCurve = curve;
+      objectScaleCurve.useOverallCurveOnly = true;
+      objectScaleCurve.timeMax = 0.25f;
+      // 8.84 8.84 8.84
+
       ContentAddition.AddEntityState<BetterScorchlingBurrow>(out _);
       burrowDef.activationState = new SerializableEntityStateType(typeof(BetterScorchlingBurrow));
       burrowDef.baseRechargeInterval = 12f;
-      //breachDef.baseRechargeInterval = 12f;
+      breachDef.activationState = new SerializableEntityStateType(typeof(BetterScorchlingBurrow));
 
       AISkillDriver[] skillDrivers = scorchlingMaster.GetComponents<AISkillDriver>();
       foreach (AISkillDriver skillDriver in skillDrivers)
       {
-        if (skillDriver.customName == "ChaseOffNodegraphClose" || skillDriver.customName == "ChaseOffNodegraph" || skillDriver.customName == "FollowNodeGraphToTarget")
+        //  if (skillDriver.customName == "ChaseOffNodegraphClose" || skillDriver.customName == "ChaseOffNodegraph" || skillDriver.customName == "FollowNodeGraphToTarget")
+        if (skillDriver.customName == "ChaseOffNodegraphClose" || skillDriver.customName == "FollowNodeGraphToTarget")
         {
           GameObject.Destroy(skillDriver);
+        }
+        if (skillDriver.customName == "ChaseOffNodegraph")
+        {
+          skillDriver.customName = "Stare";
+          skillDriver.maxDistance = float.PositiveInfinity;
+          skillDriver.minDistance = 0f;
+          skillDriver.skillSlot = SkillSlot.None;
+          skillDriver.requireSkillReady = false;
         }
         if (skillDriver.customName == "Breach")
         {
@@ -63,19 +91,18 @@ namespace ScorchWurmTweaks
           skillDriver.requiredSkill = null;
           skillDriver.activationRequiresAimConfirmation = false;
           skillDriver.aimType = AISkillDriver.AimType.AtMoveTarget;
-          //skillDriver.noRepeat = false;
         }
         if (skillDriver.customName == "LavaBomb")
         {
           //  skillDriver.activationRequiresTargetLoS = true;
-          skillDriver.maxDistance = 50;
+          skillDriver.maxDistance = 50f;
           skillDriver.noRepeat = false;
           // skillDriver.activationRequiresTargetLoS = true;
         }
       }
 
       On.EntityStates.Scorchling.ScorchlingBreach.OnEnter += TweakBreachState;
-      On.EntityStates.Scorchling.SpawnState.OnEnter += TweakSpawn;
+      On.EntityStates.Scorchling.SpawnState.OnEnter += TweakSpawnState;
       On.ScorchlingController.Burrow += TweakBurrow;
       On.ScorchlingController.Breach += TweakBreach;
 
@@ -83,7 +110,7 @@ namespace ScorchWurmTweaks
       Log.Info_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
     }
 
-    private void TweakSpawn(On.EntityStates.Scorchling.SpawnState.orig_OnEnter orig, EntityStates.Scorchling.SpawnState self)
+    private void TweakSpawnState(On.EntityStates.Scorchling.SpawnState.orig_OnEnter orig, EntityStates.Scorchling.SpawnState self)
     {
       orig(self);
       self.outer.SetNextState(new EntityStates.Scorchling.ScorchlingBreach());
@@ -96,8 +123,6 @@ namespace ScorchWurmTweaks
       self.SetTeleportPermission(true);
       if (NetworkServer.active)
       {
-        // self.breachSkill.stock = 1;
-        // self.lavaBombSkill.stock = 0;
         self.ensureBurrowSkill.stock = 0;
         self.characterMotor.walkSpeedPenaltyCoefficient = 1f;
         if (self.characterBody.GetBuffCount(RoR2Content.Buffs.HiddenInvincibility.buffIndex) < 1)
@@ -105,7 +130,7 @@ namespace ScorchWurmTweaks
       }
       self.originalLayer = self.gameObject.layer;
       self.gameObject.layer = LayerIndex.GetAppropriateFakeLayerForTeam(self.characterBody.teamComponent.teamIndex).intVal;
-      self.characterMotor.Motor.RebuildCollidableLayers();
+      // self.characterMotor.Motor.RebuildCollidableLayers();
       if ((bool)self.baseDirt && (bool)self.dustTrail)
       {
         self.baseDirt.SetActive(false);
@@ -124,9 +149,7 @@ namespace ScorchWurmTweaks
       if (NetworkServer.active)
       {
         self.characterBody.RemoveBuff(RoR2Content.Buffs.HiddenInvincibility.buffIndex);
-        // self.breachSkill.stock = 0;
         self.lavaBombSkill.stock = 1;
-        // self.ensureBurrowSkill.stock = 5;
         self.characterMotor.walkSpeedPenaltyCoefficient = 0.0f;
         if ((bool)self.characterBody)
           self.characterBody.isSprinting = false;
@@ -154,7 +177,9 @@ namespace ScorchWurmTweaks
     {
       new ILHook(typeof(Main).GetMethod(nameof(BaseStateOnEnterCaller), allFlags), BaseStateOnEnterCallerMethodModifier);
 
-      // self.proceedImmediatelyToLavaBomb = true;
+      self.crackToBreachTime = 2f;
+      self.breachToBurrow = 2f;
+      self.proceedImmediatelyToLavaBomb = false;
       self.amServer = NetworkServer.active;
       self.scorchlingController = self.characterBody.GetComponent<ScorchlingController>();
       Util.PlaySound(self.preBreachSoundString, self.gameObject);
@@ -190,7 +215,7 @@ namespace ScorchWurmTweaks
       if ((bool)self.characterMotor)
         self.characterMotor.walkSpeedPenaltyCoefficient = 0.0f;
       self.characterBody.SetAimTimer(self.breachToBurrow);
-      TeleportHelper.TeleportBody(self.characterBody, self.breachPosition);
+      TeleportHelper.TeleportBody(self.characterBody, self.breachPosition, false);
       EffectManager.SpawnEffect(self.crackEffectPrefab, new EffectData()
       {
         origin = self.breachPosition,
