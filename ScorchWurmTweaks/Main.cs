@@ -44,10 +44,10 @@ namespace ScorchWurmTweaks
 
       Log.Init(Logger);
 
-      new ILHook(typeof(Main).GetMethod(nameof(BaseStateOnEnterCaller), allFlags), BaseStateOnEnterCallerMethodModifier);
+      { new ILHook(typeof(Main).GetMethod(nameof(BaseStateOnEnterCaller), allFlags), BaseStateOnEnterCallerMethodModifier); }
 
       ContentAddition.AddEntityState<BetterScorchlingBurrow>(out _);
-      // TODO: rewrite the component and entitystates cuz it freaks out in mp for some reason, man...
+
       LoadAssets();
       TweakBody();
       TweakBurrowDef();
@@ -88,7 +88,7 @@ namespace ScorchWurmTweaks
 
     private void TweakBreachState(On.EntityStates.Scorchling.ScorchlingBreach.orig_OnEnter orig, EntityStates.Scorchling.ScorchlingBreach self)
     {
-      { new ILHook(typeof(Main).GetMethod(nameof(BaseStateOnEnterCaller), allFlags), BaseStateOnEnterCallerMethodModifier); }
+      BaseStateOnEnterCaller(self);
 
       self.crackToBreachTime = 2f;
       self.breachToBurrow = 2.1f;
@@ -96,14 +96,7 @@ namespace ScorchWurmTweaks
       self.amServer = NetworkServer.active;
       self.scorchlingController = self.characterBody.GetComponent<ScorchlingController>();
       Util.PlaySound(self.preBreachSoundString, self.gameObject);
-      if (!self.amServer)
-        return;
       self.enemyCBody = self.characterBody.master.GetComponent<BaseAI>().currentEnemy?.characterBody;
-      if (self.proceedImmediatelyToLavaBomb)
-        self.breachToBurrow = 1f;
-      self.breachToBurrow += self.crackToBreachTime;
-      self.burrowToEndOfTime += self.breachToBurrow;
-      self.breachPosition = self.characterBody.footPosition;
 
       if ((bool)self.enemyCBody)
       {
@@ -124,6 +117,15 @@ namespace ScorchWurmTweaks
         }
         self.breachPosition = position2 + Vector3.up * 1.5f;
       }
+      /*
+      if (!self.amServer)
+        return;
+        */
+      if (self.proceedImmediatelyToLavaBomb)
+        self.breachToBurrow = 1f;
+      self.breachToBurrow += self.crackToBreachTime;
+      self.burrowToEndOfTime += self.breachToBurrow;
+      self.breachPosition = self.characterBody.footPosition;
 
       self.characterBody.SetAimTimer(self.breachToBurrow);
       TeleportHelper.TeleportBody(self.characterBody, self.breachPosition, false);
