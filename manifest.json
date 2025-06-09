@@ -1,9 +1,9 @@
 ﻿{
 	"name": "ScorchWurmTweaks",
-	"version_number": "1.1.0",
+	"version_number": "1.1.1",
 	"website_url": "https://github.com/Nuxlar/ScorchWurmTweaks/issues",
 	"description": "Tweaks to the Scorch Wurm Enemy",
 	"dependencies": [
-		"RiskofThunder-R2API_ContentManagement-1.0.9"
+		"RiskofThunder-R2API_ContentManagement-1.0.10"
 	]
 }

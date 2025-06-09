@@ -1,3 +1,9 @@
+**1.1.1**
+
+- Updated for Memory Optimization Update
+- Fixed Scorch Wurms multiplayer issues
+- Fixed occasional console errors
+
 **1.1.0**
 
 - Reworks burrow/breach

@@ -28,7 +28,7 @@ public class BetterScorchlingBurrow : BaseState
         base.OnEnter();
         this.sController = this.characterBody.GetComponent<ScorchlingController>();
 
-        if (this.sController.isBurrowed || !ShouldReposition())
+        if (!ShouldReposition())
             return;
         Util.PlaySound(this.burrowSoundString, this.gameObject);
         Util.PlaySound(this.burrowLoopSoundString, this.gameObject);
