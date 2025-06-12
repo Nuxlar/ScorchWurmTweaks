@@ -18,6 +18,7 @@ using RoR2.Skills;
 using RoR2.Projectile;
 using KinematicCharacterController;
 using RoR2.ContentManagement;
+using EntityStates.Scorchling;
 
 namespace ScorchWurmTweaks
 {
@@ -46,6 +47,7 @@ namespace ScorchWurmTweaks
 
       { new ILHook(typeof(Main).GetMethod(nameof(BaseStateOnEnterCaller), allFlags), BaseStateOnEnterCallerMethodModifier); }
 
+      ContentAddition.AddEntityState<CheckReposition>(out _);
       ContentAddition.AddEntityState<BetterScorchlingBurrow>(out _);
 
       LoadAssets();
@@ -55,35 +57,94 @@ namespace ScorchWurmTweaks
       TweakSkillDrivers();
       TweakProjectileGhost();
 
+      IL.ScorchlingController.Update += PreventBreakage;
       On.EntityStates.Scorchling.ScorchlingBreach.OnEnter += TweakBreachState;
       On.EntityStates.Scorchling.SpawnState.OnEnter += TweakSpawnState;
-      On.ScorchlingController.Burrow += TweakBurrow;
-      On.ScorchlingController.Breach += TweakBreach;
+      On.ScorchlingController.Start += IncreaseTrailDelay;
+      On.ScorchlingController.Burrow += ReplaceBurrow;
+      On.ScorchlingController.Breach += ReplaceBreach;
 
       stopwatch.Stop();
       Log.Info_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
     }
 
+    private void PreventBreakage(ILContext il)
+    {
+      ILCursor c = new ILCursor(il);
+      Instruction instr = null;
+      if (c.TryGotoNext(MoveType.AfterLabel,
+        x => x.MatchLdarg(0),
+        x => x.MatchLdfld(out _),
+        x => x.MatchCallOrCallvirt<CharacterMotor>("get_" + nameof(CharacterMotor.isGrounded)),
+        x => x.MatchBrtrue(out _),
+        x => MatchAny(x, out instr)
+      ))
+      {
+        c.Emit(OpCodes.Br, instr);
+      }
+    }
+
+    private void IncreaseTrailDelay(On.ScorchlingController.orig_Start orig, ScorchlingController self)
+    {
+      self.timeInAirToShutOffDustTrail = 10f;
+      orig(self);
+    }
+
     private void TweakSpawnState(On.EntityStates.Scorchling.SpawnState.orig_OnEnter orig, EntityStates.Scorchling.SpawnState self)
     {
       orig(self);
-      self.outer.SetNextState(new BetterScorchlingBurrow());
+      self.outer.SetNextState(new ScorchlingBreach());
     }
 
-    private void TweakBurrow(On.ScorchlingController.orig_Burrow orig, ScorchlingController self)
+    private void ReplaceBurrow(On.ScorchlingController.orig_Burrow orig, ScorchlingController self)
     {
-      orig(self);
-      self.breachSkill.stock = 0;
-      self.lavaBombSkill.stock = 0;
-      self.ensureBurrowSkill.stock = 0;
+      self.isRecentlyBurrowed = true;
+      self.isBurrowed = true;
+      self.SetTeleportPermission(true);
+      if (NetworkServer.active)
+      {
+        self.ensureBurrowSkill.stock = 0;
+        if (self.characterBody.GetBuffCount(RoR2Content.Buffs.HiddenInvincibility.buffIndex) < 1)
+          self.characterBody.AddBuff(RoR2Content.Buffs.HiddenInvincibility.buffIndex);
+      }
+      self.originalLayer = self.gameObject.layer;
+      self.gameObject.layer = LayerIndex.GetAppropriateFakeLayerForTeam(self.characterBody.teamComponent.teamIndex).intVal;
+      if ((bool)self.baseDirt && (bool)self.dustTrail)
+      {
+        self.baseDirt.SetActive(false);
+        self.dustTrail.SetActive(true);
+        self.dustTrailActive = true;
+        self.armatureObject.SetActive(false);
+        self.meshObject.SetActive(false);
+      }
+      self.enemyDetection.Enable();
     }
 
-    private void TweakBreach(On.ScorchlingController.orig_Breach orig, ScorchlingController self)
+    private void ReplaceBreach(On.ScorchlingController.orig_Breach orig, ScorchlingController self)
     {
-      orig(self);
-      self.breachSkill.stock = 0;
-      self.lavaBombSkill.stock = 1;
-      self.ensureBurrowSkill.stock = 0;
+      self.isBurrowed = false;
+      self.SetTeleportPermission(false);
+      if (NetworkServer.active)
+      {
+        self.characterBody.RemoveBuff(RoR2Content.Buffs.HiddenInvincibility.buffIndex);
+        self.lavaBombSkill.stock = 1;
+        if ((bool)self.characterBody)
+          self.characterBody.isSprinting = false;
+        self.breachBaseDirtRotation = self.baseDirt.transform.rotation;
+        self.breachBaseDirtRotation.eulerAngles = new Vector3(self.breachBaseDirtRotation.eulerAngles.x, Mathf.Floor(self.breachBaseDirtRotation.eulerAngles.y), self.breachBaseDirtRotation.eulerAngles.z);
+        self.baseDirt.transform.localEulerAngles = Vector3.zero;
+        self.baseDirt.transform.rotation = self.breachBaseDirtRotation;
+      }
+      self.gameObject.layer = self.originalLayer;
+      if ((bool)self.baseDirt && (bool)self.dustTrail)
+      {
+        self.baseDirt.SetActive(true);
+        self.dustTrail.SetActive(false);
+        self.dustTrailActive = false;
+        self.armatureObject.SetActive(true);
+        self.meshObject.SetActive(true);
+      }
+      self.enemyDetection.Disable();
     }
 
     private void TweakBreachState(On.EntityStates.Scorchling.ScorchlingBreach.orig_OnEnter orig, EntityStates.Scorchling.ScorchlingBreach self)
@@ -91,41 +152,23 @@ namespace ScorchWurmTweaks
       BaseStateOnEnterCaller(self);
 
       self.crackToBreachTime = 2f;
-      self.breachToBurrow = 2.1f;
+      self.breachToBurrow = 2f;
       self.proceedImmediatelyToLavaBomb = false;
       self.amServer = NetworkServer.active;
       self.scorchlingController = self.characterBody.GetComponent<ScorchlingController>();
       Util.PlaySound(self.preBreachSoundString, self.gameObject);
       self.enemyCBody = self.characterBody.master.GetComponent<BaseAI>().currentEnemy?.characterBody;
 
-      if ((bool)self.enemyCBody)
-      {
-        NodeGraph nodeGraph = SceneInfo.instance.GetNodeGraph(MapNodeGroup.GraphType.Ground);
-        Vector3 position1 = self.enemyCBody.coreTransform.position;
-        List<NodeGraph.NodeIndex> nodesInRange = nodeGraph.FindNodesInRange(position1, 10f, 20f, HullMask.Golem);
-        Vector3 position2 = new Vector3();
-        bool flag = false;
-        int num1 = 35;
-        while (!flag)
-        {
-          NodeGraph.NodeIndex nodeIndex = nodesInRange.ElementAt<NodeGraph.NodeIndex>(UnityEngine.Random.Range(0, nodesInRange.Count));
-          nodeGraph.GetNodePosition(nodeIndex, out position2);
-          double num2 = (double)Vector3.Distance(self.characterBody.coreTransform.position, position2);
-          --num1;
-          if (num2 > 35.0 || num1 < 0)
-            flag = true;
-        }
-        self.breachPosition = position2 + Vector3.up * 1.5f;
-      }
-      /*
-      if (!self.amServer)
-        return;
-        */
+      BreachComponentNux breachComponent = self.gameObject.GetComponent<BreachComponentNux>();
+      if (breachComponent.breachPosition != Vector3.zero)
+        self.breachPosition = breachComponent.breachPosition;
+      else
+        self.breachPosition = self.characterBody.footPosition;
+
       if (self.proceedImmediatelyToLavaBomb)
         self.breachToBurrow = 1f;
       self.breachToBurrow += self.crackToBreachTime;
       self.burrowToEndOfTime += self.breachToBurrow;
-      self.breachPosition = self.characterBody.footPosition;
 
       self.characterBody.SetAimTimer(self.breachToBurrow);
       TeleportHelper.TeleportBody(self.characterBody, self.breachPosition, false);
@@ -149,7 +192,7 @@ namespace ScorchWurmTweaks
       AssetAsyncReferenceManager<SkillDef>.LoadAsset(defRef).Completed += (x) =>
       {
         SkillDef breachDef = x.Result;
-        breachDef.activationState = new SerializableEntityStateType(typeof(BetterScorchlingBurrow));
+        breachDef.activationState = new SerializableEntityStateType(typeof(CheckReposition));
       };
     }
 
@@ -159,7 +202,7 @@ namespace ScorchWurmTweaks
       AssetAsyncReferenceManager<SkillDef>.LoadAsset(defRef).Completed += (x) =>
       {
         SkillDef burrowDef = x.Result;
-        burrowDef.activationState = new SerializableEntityStateType(typeof(BetterScorchlingBurrow));
+        burrowDef.activationState = new SerializableEntityStateType(typeof(CheckReposition));
         burrowDef.baseRechargeInterval = 12f;
       };
     }
@@ -171,8 +214,9 @@ namespace ScorchWurmTweaks
       {
         CharacterBody body = x.Result.GetComponent<CharacterBody>();
         body.baseMoveSpeed = 0f;
-        //  Destroy(scorchlingBody.GetComponent<CharacterMotor>());
-        //  Destroy(scorchlingBody.GetComponent<KinematicCharacterMotor>());
+        x.Result.AddComponent<BreachComponentNux>();
+        Destroy(body.GetComponent<CharacterMotor>());
+        Destroy(body.GetComponent<KinematicCharacterMotor>());
       };
     }
 
@@ -245,6 +289,12 @@ namespace ScorchWurmTweaks
       var cursor = new ILCursor(il);
       cursor.Emit(OpCodes.Ldarg_0);
       cursor.Emit(OpCodes.Call, typeof(BaseState).GetMethod(nameof(BaseState.OnEnter), allFlags));
+    }
+
+    public static bool MatchAny(Instruction instr, out Instruction instruction)
+    {
+      instruction = instr;
+      return true;
     }
   }
 }
