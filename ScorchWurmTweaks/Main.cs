@@ -29,7 +29,7 @@ namespace ScorchWurmTweaks
     public const string PluginGUID = PluginAuthor + "." + PluginName;
     public const string PluginAuthor = "Nuxlar";
     public const string PluginName = "ScorchWurmTweaks";
-    public const string PluginVersion = "1.1.1";
+    public const string PluginVersion = "1.2.0";
 
     internal static Main Instance { get; private set; }
     public static string PluginDirectory { get; private set; }
@@ -41,13 +41,12 @@ namespace ScorchWurmTweaks
     {
       Instance = this;
 
-      Stopwatch stopwatch = Stopwatch.StartNew();
-
       Log.Init(Logger);
 
       { new ILHook(typeof(Main).GetMethod(nameof(BaseStateOnEnterCaller), allFlags), BaseStateOnEnterCallerMethodModifier); }
 
       ContentAddition.AddEntityState<CheckReposition>(out _);
+      ContentAddition.AddEntityState<BetterLavaBomb>(out _);
       ContentAddition.AddEntityState<BetterScorchlingBurrow>(out _);
 
       LoadAssets();
@@ -56,6 +55,7 @@ namespace ScorchWurmTweaks
       TweakBreachDef();
       TweakSkillDrivers();
       TweakProjectileGhost();
+      TweakLavaBombDef();
 
       IL.ScorchlingController.Update += PreventBreakage;
       On.EntityStates.Scorchling.ScorchlingBreach.OnEnter += TweakBreachState;
@@ -63,9 +63,6 @@ namespace ScorchWurmTweaks
       On.ScorchlingController.Start += IncreaseTrailDelay;
       On.ScorchlingController.Burrow += ReplaceBurrow;
       On.ScorchlingController.Breach += ReplaceBreach;
-
-      stopwatch.Stop();
-      Log.Info_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalSeconds:F2} seconds");
     }
 
     private void PreventBreakage(ILContext il)
@@ -151,8 +148,8 @@ namespace ScorchWurmTweaks
     {
       BaseStateOnEnterCaller(self);
 
-      self.crackToBreachTime = 2f;
-      self.breachToBurrow = 2f;
+      self.crackToBreachTime = 1f;
+      self.breachToBurrow = 1f;
       self.proceedImmediatelyToLavaBomb = false;
       self.amServer = NetworkServer.active;
       self.scorchlingController = self.characterBody.GetComponent<ScorchlingController>();
@@ -165,8 +162,6 @@ namespace ScorchWurmTweaks
       else
         self.breachPosition = self.characterBody.footPosition;
 
-      if (self.proceedImmediatelyToLavaBomb)
-        self.breachToBurrow = 1f;
       self.breachToBurrow += self.crackToBreachTime;
       self.burrowToEndOfTime += self.breachToBurrow;
 
@@ -193,6 +188,16 @@ namespace ScorchWurmTweaks
       {
         SkillDef breachDef = x.Result;
         breachDef.activationState = new SerializableEntityStateType(typeof(CheckReposition));
+      };
+    }
+
+    private void TweakLavaBombDef()
+    {
+      AssetReferenceT<SkillDef> defRef = new AssetReferenceT<SkillDef>(RoR2BepInExPack.GameAssetPaths.RoR2_DLC2_Scorchling.ScorchlingLavaBomb_asset);
+      AssetAsyncReferenceManager<SkillDef>.LoadAsset(defRef).Completed += (x) =>
+      {
+        SkillDef lavaBombDef = x.Result;
+        lavaBombDef.activationState = new SerializableEntityStateType(typeof(BetterLavaBomb));
       };
     }
 
