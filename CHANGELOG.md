@@ -1,6 +1,9 @@
 **1.2.0**
 
-- 
+- Reduces burrow/emerge time (2s -> 1s)
+- Reduces Lava Bomb cooldown (8s -> 6s)
+- Increases Lava Bomb flight time (1s -> 1.25s)
+- Improves Lava Bomb targeting (goes for wurm's target instead of nearest enemy)
 
 **1.1.1**
 

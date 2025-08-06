@@ -12,7 +12,7 @@
 
 ### Lava Bomb Tweaks
 
-- Lava Bomb activation range reduced (80 -> 50)
+- Lava Bomb max activation range reduced (80 -> 50)
 - Lava Bomb damage zone now has a slight expanding animation initially
 
 ### Fixes
