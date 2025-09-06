@@ -1,3 +1,7 @@
+**1.2.1**
+
+- Fixes error log spam
+
 **1.2.0**
 
 - Reduces burrow/emerge time (2s -> 1s)

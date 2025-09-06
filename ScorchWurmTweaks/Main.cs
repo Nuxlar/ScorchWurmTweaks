@@ -23,7 +23,7 @@ namespace ScorchWurmTweaks
         public const string PluginGUID = PluginAuthor + "." + PluginName;
         public const string PluginAuthor = "Nuxlar";
         public const string PluginName = "ScorchWurmTweaks";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.2.1";
 
         internal static Main Instance { get; private set; }
         public static string PluginDirectory { get; private set; }

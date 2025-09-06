@@ -49,6 +49,8 @@ public class CheckReposition : BaseState
             Vector3 position2 = new Vector3();
             bool flag = false;
             int num1 = 35;
+            if (nodesInRange.Count > 0)
+            {
             while (!flag)
             {
                 NodeGraph.NodeIndex nodeIndex = nodesInRange.ElementAt<NodeGraph.NodeIndex>(UnityEngine.Random.Range(0, nodesInRange.Count));
@@ -66,6 +68,7 @@ public class CheckReposition : BaseState
 
             if (shouldReposition)
                 breachComponent.breachPosition = breachPosition;
+            }
         }
     }
 
