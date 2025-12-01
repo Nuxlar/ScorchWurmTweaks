@@ -1,3 +1,7 @@
+**1.2.2**
+
+- Updated for Alloyed Collective
+
 **1.2.1**
 
 - Fixes error log spam
